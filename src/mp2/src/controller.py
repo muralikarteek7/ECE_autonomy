@@ -84,16 +84,8 @@ class vehicleController():
 
         _,_ , yaw = quaternion_to_euler(currentPose.pose.orientation.x,currentPose.pose.orientation.y,currentPose.pose.orientation.z,currentPose.pose.orientation.w)
         
+        return pos_x, pos_y, vel, yaw
 
-
-        ####################### TODO: Your Task 1 code ends Here #######################
-
-        return pos_x, pos_y, vel, yaw # note that yaw is in radian
-
-    # Task 2: Longtitudal Controller
-    # Based on all unreached waypoints, and your current vehicle state, decide your velocity
-    
-    
 
 
     def longititudal_controller(self, curr_x, curr_y, curr_vel, curr_yaw, future_unreached_waypoints):
@@ -116,30 +108,34 @@ class vehicleController():
         #print(future_unreached_waypoints[0],future_unreached_waypoints[1])
         x1, y1 = future_unreached_waypoints[0]
         x2, y2 = future_unreached_waypoints[1]
-        
+        #x3, y3 = future_unreached_waypoints[2]
 
 
         y2 =y2 - y1
         x2 =x2 - x1
 
 
+        print(x1,curr_x, y1, curr_y,math.atan2(y1 - curr_y, x1 - curr_x)*180/3.14 )
+
         x1 =x1 - curr_x
-        y1 =y2 - curr_y
+        y1 =y1 - curr_y
 
 
         
         # Calculate the curvature based on the next 3 waypoints
         curvature, curvature1 = calculate_curvature(x1, y1, x2, y2, curr_yaw)
         
-        curvature = abs(curvature - curr_yaw)
-        curvature1 = abs(curvature1 - curr_yaw)
-        print(curvature,curvature1)
+        curvature = abs(abs(curvature) - abs(curr_yaw))
+        curvature1 = abs((curvature1) - abs(curr_yaw))
+        print(curvature*180/3.14,curvature1*180/3.14, curr_yaw*180/3.14)
+        print(curvature,curvature1, curr_yaw)
+        
 
-        if abs(curvature) <2 and abs(curvature1) < 0.15:  # Threshold for curvature, adjust as needed
+        if abs(curvature) <0.1 and abs(curvature1) < 0.1:  # Threshold for curvature, adjust as needed
             target_vel = high_speed  # Straight path
             print("high speed")
 
-        elif abs(curvature) <2 and abs(curvature1) > 0.15:
+        elif abs(curvature) <0.1 and abs(curvature1) > 0.1:
             target_vel = mid_speed
             print("mid speed")
         else:
