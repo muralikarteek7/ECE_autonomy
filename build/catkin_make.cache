@@ -1,0 +1,2 @@
+actor_collision:gem_simulator/gem_description:gem_simulator/gem_gazebo:mp1:mp2:ros-gazebo-sample-experiments:velodyne_simulator/velodyne_description:velodyne_simulator/velodyne_gazebo_plugins:velodyne_simulator/velodyne_simulator
+-DCATKIN_DEVEL_PREFIX=/home/mkg7/ECE_autonomy/devel -DCMAKE_INSTALL_PREFIX=/home/mkg7/ECE_autonomy/install -G Unix Makefiles
