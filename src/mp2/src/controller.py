@@ -9,6 +9,7 @@ from util import euler_to_quaternion, quaternion_to_euler
 import time
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
+from std_msgs.msg import Float32MultiArray
 
 
 
@@ -33,9 +34,11 @@ class vehicleController():
         # Publisher to publish the control input to the vehicle model
         self.controlPub = rospy.Publisher("/ackermann_cmd", AckermannDrive, queue_size = 1)
         self.futurepoints = rospy.Publisher('future_waypoints', Marker, queue_size=10)
+        self.points =  rospy.Publisher('vehicle_data', Float32MultiArray, queue_size=10)
+        
         self.prev_vel = 0
         self.L = 1.75 # Wheelbase, can be get from gem_control.py
-        self.log_acceleration = False
+        self.log_acceleration = True
 
         
         self.prev_error = 0.0
@@ -43,8 +46,7 @@ class vehicleController():
         self.Kp = 1.0  # Proportional gain
         self.Ki = 0.0  # Integral gain
         self.Kd = 0.1  # Derivative gain
-        self.dt = 0.1  # Time step
-
+        self.dt = time.time() 
 
     def getModelState(self):
         # Get the current state of the vehicle
@@ -96,7 +98,7 @@ class vehicleController():
 
         ####################### TODO: Your TASK 2 code ends Here #######################
         
-        high_speed = 20
+        high_speed = 23     #22
         mid_speed= 18  # for straight sections
         low_speed = 8.0   # for turns
         #print(curr_vel,len(future_unreached_waypoints))
@@ -115,7 +117,7 @@ class vehicleController():
         x2 =x2 - x1
 
 
-        print(x1,curr_x, y1, curr_y,math.atan2(y1 - curr_y, x1 - curr_x)*180/3.14 )
+        #print(x1,curr_x, y1, curr_y,math.atan2(y1 - curr_y, x1 - curr_x)*180/3.14 )
 
         x1 =x1 - curr_x
         y1 =y1 - curr_y
@@ -127,20 +129,20 @@ class vehicleController():
         
         curvature = abs(abs(curvature) - abs(curr_yaw))
         curvature1 = abs((curvature1) - abs(curr_yaw))
-        print(curvature*180/3.14,curvature1*180/3.14, curr_yaw*180/3.14)
-        print(curvature,curvature1, curr_yaw)
+        #print(curvature*180/3.14,curvature1*180/3.14, curr_yaw*180/3.14)
+        #print(curvature,curvature1, curr_yaw)
         
 
         if abs(curvature) <0.1 and abs(curvature1) < 0.1:  # Threshold for curvature, adjust as needed
             target_vel = high_speed  # Straight path
-            print("high speed")
+            #print("high speed")
 
         elif abs(curvature) <0.1 and abs(curvature1) > 0.1:
             target_vel = mid_speed
-            print("mid speed")
+            #print("mid speed")
         else:
             target_vel = low_speed   # Shalen(future_unreached_waypoints) > 94rp turn
-            print("low speed")
+            #print("low speed")
         return target_vel
         #return target_velocity
 
@@ -179,7 +181,7 @@ class vehicleController():
 
         curr_x, curr_y, curr_vel, curr_yaw = self.extract_vehicle_info(currentPose)
 
-        # Acceleration Profile
+        acceleration = 0
         if self.log_acceleration:
             acceleration = (curr_vel- self.prev_vel) * 100 # Since we are running in 100Hz
 
@@ -223,7 +225,14 @@ class vehicleController():
             point.z = 0  # Assuming 2D
             marker.points.append(point)
 
+        data_msg = Float32MultiArray()
+        timecurr = time.time() - self.dt
+        data_msg.data = [curr_x, curr_y, curr_vel, curr_yaw , acceleration , timecurr]
+        self.points.publish(data_msg)
+        #self.dt = time.time()
         marker.header.stamp = rospy.Time.now()
+
+        
         self.futurepoints.publish(marker)
 
     def stop(self):
