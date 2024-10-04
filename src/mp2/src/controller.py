@@ -12,16 +12,16 @@ from geometry_msgs.msg import Point
 
 
 
-def calculate_curvature(x1, y1, x2, y2, x3, y3):
+def calculate_curvature(x1, y1, x2, y2,curr_yaw):
         # Calculate the curvature using three consecutive points
         # Points: (x1, y1), (x2, y2), (x3, y3)
-        dx1 = x2 - x1
-        dy1 = y2 - y1
-        dx2 = x3 - x2
-        dy2 = y3 - y2
+        dx1 = x1
+        dy1 = y1
+        dx2 = x2
+        dy2 = y2
         
-        angle1 = np.arctan2(dy1, dx1)
-        angle2 = np.arctan2(dy2, dx2)
+        angle1 = math.atan2(dy1, dx1)
+        angle2 = math.atan2(dy2, dx2)
         
         # The curvature is proportional to the change in angle
         
@@ -37,11 +37,14 @@ class vehicleController():
         self.L = 1.75 # Wheelbase, can be get from gem_control.py
         self.log_acceleration = False
 
-        self.kp = 0
-        self.ki = 0
-        self.kd = 0
-        self.preverror = 0
-        self.sumerror = 0
+        
+        self.prev_error = 0.0
+        self.integral = 0.0
+        self.Kp = 1.0  # Proportional gain
+        self.Ki = 0.0  # Integral gain
+        self.Kd = 0.1  # Derivative gain
+        self.dt = 0.1  # Time step
+
 
     def getModelState(self):
         # Get the current state of the vehicle
@@ -101,31 +104,42 @@ class vehicleController():
 
         ####################### TODO: Your TASK 2 code ends Here #######################
         
-        high_speed = 19
-        mid_speed= 15  # for straight sections
+        high_speed = 20
+        mid_speed= 18  # for straight sections
         low_speed = 8.0   # for turns
         #print(curr_vel,len(future_unreached_waypoints))
         # If there are less than 3 waypoints, we can't calculate curvature
-        if len(future_unreached_waypoints) < 3:
+        if len(future_unreached_waypoints) < 2:
             return high_speed  # Default to high speed if insufficient waypoints
         
         # Extract the current and future waypoints
         #print(future_unreached_waypoints[0],future_unreached_waypoints[1])
         x1, y1 = future_unreached_waypoints[0]
         x2, y2 = future_unreached_waypoints[1]
-        x3, y3 = future_unreached_waypoints[2]
+        
+
+
+        y2 =y2 - y1
+        x2 =x2 - x1
+
+
+        x1 =x1 - curr_x
+        y1 =y2 - curr_y
+
+
         
         # Calculate the curvature based on the next 3 waypoints
-        curvature, curvature1 = calculate_curvature(x1, y1, x2, y2, x3, y3)
+        curvature, curvature1 = calculate_curvature(x1, y1, x2, y2, curr_yaw)
         
-        # Set target speed based on curvature
+        curvature = abs(curvature - curr_yaw)
+        curvature1 = abs(curvature1 - curr_yaw)
+        print(curvature,curvature1)
 
-
-        if abs(curvature) < 0.1 and abs(curvature1) < 0.1:  # Threshold for curvature, adjust as needed
+        if abs(curvature) <2 and abs(curvature1) < 0.15:  # Threshold for curvature, adjust as needed
             target_vel = high_speed  # Straight path
             print("high speed")
 
-        elif abs(curvature) < 0.1 and abs(curvature1) > 0.1:
+        elif abs(curvature) <2 and abs(curvature1) > 0.15:
             target_vel = mid_speed
             print("mid speed")
         else:
@@ -139,56 +153,20 @@ class vehicleController():
     def pure_pursuit_lateral_controller(self, curr_x, curr_y, curr_yaw, target_point, future_unreached_waypoints):
 
         ####################### TODO: Your TASK 3 code starts Here #######################
-        target_steering = 0
+        # x,y = target_point
+        x,y = future_unreached_waypoints[0]
+        if len(future_unreached_waypoints) > 1:
+            x = (x + future_unreached_waypoints[1][0])/2
+            y = (y + future_unreached_waypoints[1][1])/2
+        dy = y - curr_y
+        dx = x - curr_x
+        theta = math.atan2(dy, dx)
+        alpha  = theta - curr_yaw
+        ld = math.sqrt(dy**2+dx**2)
+        target_steering = math.atan2(2*self.L*math.sin(alpha), ld)
 
         ####################### TODO: Your TASK 3 code starts Here #######################
-
-        if len(future_unreached_waypoints) > 1 :
-            lookahead_x, lookahead_y = target_point
-            
-            lookahead_x2, lookahead_y2 = future_unreached_waypoints[1]
-        
-            # Step 1: Calculate the lookahead distance (ld)
-            ld = math.sqrt((lookahead_x - curr_x)**2 + (lookahead_y - curr_y)**2)
-            ld2 = math.sqrt((lookahead_x2 - curr_x)**2 + (lookahead_y2 - curr_y)**2)
-            ld = ld/2+ld2/2
-            
-            # Step 2: Compute the angle (α) between the vehicle's heading and the lookahead point
-            angle_to_lookahead = math.atan2(lookahead_y - curr_y, lookahead_x - curr_x)
-            angle_to_lookahead2 = math.atan2(lookahead_y2 - curr_y, lookahead_x2 - curr_x)
-            alpha = angle_to_lookahead - curr_yaw
-            alpha2 = angle_to_lookahead2 - curr_yaw
-
-            alpha = alpha/2 + alpha2/2
-            # Normalize alpha to be within [-pi, pi]
-            alpha = (alpha + math.pi) % (2 * math.pi) - math.pi
-        else: 
-            lookahead_x, lookahead_y = target_point
-            
-            #lookahead_x2, lookahead_y2 = future_unreached_waypoints[1]
-        
-            # Step 1: Calculate the lookahead distance (ld)
-            ld = math.sqrt((lookahead_x - curr_x)**2 + (lookahead_y - curr_y)**2)
-            #ld2 = math.sqrt((lookahead_x2 - curr_x)**2 + (lookahead_y2 - curr_y)**2)
-            #ld = ld/2+ld2/2
-            
-            # Step 2: Compute the angle (α) between the vehicle's heading and the lookahead point
-            angle_to_lookahead = math.atan2(lookahead_y - curr_y, lookahead_x - curr_x)
-            #angle_to_lookahead2 = math.atan2(lookahead_y2 - curr_y, lookahead_x2 - curr_x)
-            alpha = angle_to_lookahead - curr_yaw
-            #alpha2 = angle_to_lookahead2 - curr_yaw
-
-            #alpha = alpha/2 + alpha2/2
-            # Normalize alpha to be within [-pi, pi]
-            alpha = (alpha + math.pi) % (2 * math.pi) - math.pi
-        
-        # Step 3: Calculate the steering angle (δ)
-        if ld > 0:  # Avoid division by zero
-            delta = math.atan((2 * self.L * math.sin(alpha)) / ld)
-        else:
-            delta = 0  # No steering if ld is zero (this scenario is unlikely)
-
-        return delta
+        return target_steering
         
         
         #return target_steering
