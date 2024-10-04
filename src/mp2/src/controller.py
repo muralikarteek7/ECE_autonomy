@@ -7,6 +7,10 @@ from std_msgs.msg import Float32MultiArray
 import math
 from util import euler_to_quaternion, quaternion_to_euler
 import time
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
+
+
 def quaternion_to_euler(x, y, z, w):
         # Convert quaternion to euler angles (roll, pitch, yaw)
         t0 = +2.0 * (w * x + y * z)
@@ -45,6 +49,7 @@ class vehicleController():
     def __init__(self):
         # Publisher to publish the control input to the vehicle model
         self.controlPub = rospy.Publisher("/ackermann_cmd", AckermannDrive, queue_size = 1)
+        self.futurepoints = rospy.Publisher('future_waypoints', Marker, queue_size=10)
         self.prev_vel = 0
         self.L = 1.75 # Wheelbase, can be get from gem_control.py
         self.log_acceleration = False
@@ -114,7 +119,7 @@ class vehicleController():
 
         ####################### TODO: Your TASK 2 code ends Here #######################
         
-        high_speed = 12.0  # for straight sections
+        high_speed = 15.0  # for straight sections
         low_speed = 8.0   # for turns
         #print(curr_vel,len(future_unreached_waypoints))
         # If there are less than 3 waypoints, we can't calculate curvature
@@ -131,7 +136,7 @@ class vehicleController():
         curvature = calculate_curvature(x1, y1, x2, y2, x3, y3)
         
         # Set target speed based on curvature
-        if curvature < 0.1:  # Threshold for curvature, adjust as needed
+        if curvature < 0.2:  # Threshold for curvature, adjust as needed
             target_vel = high_speed  # Straight path
         else:
             target_vel = low_speed   # Sharp turn
@@ -147,17 +152,46 @@ class vehicleController():
         target_steering = 0
 
         ####################### TODO: Your TASK 3 code starts Here #######################
-        lookahead_x, lookahead_y = target_point
-    
-        # Step 1: Calculate the lookahead distance (ld)
-        ld = math.sqrt((lookahead_x - curr_x)**2 + (lookahead_y - curr_y)**2)
+
+        #if len(future_unreached_waypoints) >
+        if len(future_unreached_waypoints) > 38 or (len(future_unreached_waypoints) < 16 and len(future_unreached_waypoints) >2 ):
+            lookahead_x, lookahead_y = target_point
+            
+            lookahead_x2, lookahead_y2 = future_unreached_waypoints[1]
         
-        # Step 2: Compute the angle (α) between the vehicle's heading and the lookahead point
-        angle_to_lookahead = math.atan2(lookahead_y - curr_y, lookahead_x - curr_x)
-        alpha = angle_to_lookahead - curr_yaw
+            # Step 1: Calculate the lookahead distance (ld)
+            ld = math.sqrt((lookahead_x - curr_x)**2 + (lookahead_y - curr_y)**2)
+            ld2 = math.sqrt((lookahead_x2 - curr_x)**2 + (lookahead_y2 - curr_y)**2)
+            ld = ld/2+ld2/2
+            
+            # Step 2: Compute the angle (α) between the vehicle's heading and the lookahead point
+            angle_to_lookahead = math.atan2(lookahead_y - curr_y, lookahead_x - curr_x)
+            angle_to_lookahead2 = math.atan2(lookahead_y2 - curr_y, lookahead_x2 - curr_x)
+            alpha = angle_to_lookahead - curr_yaw
+            alpha2 = angle_to_lookahead2 - curr_yaw
+
+            alpha = alpha/2 + alpha2/2
+            # Normalize alpha to be within [-pi, pi]
+            alpha = (alpha + math.pi) % (2 * math.pi) - math.pi
+        else:
+            lookahead_x, lookahead_y = target_point
+            
+            #lookahead_x2, lookahead_y2 = future_unreached_waypoints[1]
         
-        # Normalize alpha to be within [-pi, pi]
-        alpha = (alpha + math.pi) % (2 * math.pi) - math.pi
+            # Step 1: Calculate the lookahead distance (ld)
+            ld = math.sqrt((lookahead_x - curr_x)**2 + (lookahead_y - curr_y)**2)
+            #ld2 = math.sqrt((lookahead_x2 - curr_x)**2 + (lookahead_y2 - curr_y)**2)
+            #ld = ld/2+ld2/2
+            
+            # Step 2: Compute the angle (α) between the vehicle's heading and the lookahead point
+            angle_to_lookahead = math.atan2(lookahead_y - curr_y, lookahead_x - curr_x)
+            #angle_to_lookahead2 = math.atan2(lookahead_y2 - curr_y, lookahead_x2 - curr_x)
+            alpha = angle_to_lookahead - curr_yaw
+            #alpha2 = angle_to_lookahead2 - curr_yaw
+
+            #alpha = alpha/2 + alpha2/2
+            # Normalize alpha to be within [-pi, pi]
+            alpha = (alpha + math.pi) % (2 * math.pi) - math.pi
 
         print(alpha,target_point, len(future_unreached_waypoints))
         
@@ -201,6 +235,35 @@ class vehicleController():
 
         # Publish the computed control input to vehicle model
         self.controlPub.publish(newAckermannCmd)
+
+
+
+
+
+        marker = Marker()
+        marker.header.frame_id = "base_footprint"  # Use your desired frame
+        marker.header.stamp = rospy.Time.now()
+        marker.ns = "waypoints"
+        marker.id = 0
+        marker.type = Marker.POINTS  # Change to POINTS
+        marker.action = Marker.ADD
+        marker.scale.x = 0.2  # Size of the points
+        marker.scale.y = 0.2  # Size of the points
+        marker.color.a = 1.0  # Alpha (transparency)
+        marker.color.r = 0.0  # Red
+        marker.color.g = 1.0  # Green
+        marker.color.b = 0.0  # Blue
+
+
+        for wp in future_unreached_waypoints:
+            point = Point()
+            point.x = wp[0]
+            point.y = wp[1]
+            point.z = 0  # Assuming 2D
+            marker.points.append(point)
+
+        marker.header.stamp = rospy.Time.now()
+        self.futurepoints.publish(marker)
 
     def stop(self):
         newAckermannCmd = AckermannDrive()
