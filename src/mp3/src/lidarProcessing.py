@@ -192,7 +192,7 @@ class LidarProcessing:
         self.y_front_right = np.mean(y_points[indices]) 
 
         # Geting sensor reading for rear_left
-        filter_rear_left = np.logical_and(x_points < 0.1, y_points > -0.1)
+        filter_rear_left = np.logical_and(x_points < 0, y_points > 0)
         filter_rear_left = np.logical_and(filter_rear_left, (np.abs(x_points + y_points) < 0.1))
         filter_rear_left = np.logical_and(filter_rear_left, pixel_vals > 128)
         indices = np.argwhere(filter_rear_left).flatten()
@@ -277,8 +277,15 @@ class LidarProcessing:
 
 
     def convert_to_image(self, x, y):
-        x_img = np.floor(-y / self.resolution).astype(np.int32)
-        y_img = np.floor(-x / self.resolution).astype(np.int32)
+        # print("resolution ", self.resolution)
+        # print("-y/ res ", -y / self.resolution)
+        # print(np.floor(-y / self.resolution).dtype)
+        x_img = 0
+        y_img = 0
+        if not np.isnan(y):
+            x_img = np.floor(-y / self.resolution).astype(np.int32)
+        if not np.isnan(x):
+            y_img = np.floor(-x / self.resolution).astype(np.int32)
 
         x_img -= int(np.floor(self.side_range[0] / self.resolution))
         y_img += int(np.ceil(self.fwd_range[1] / self.resolution))
@@ -320,7 +327,7 @@ class LidarProcessing:
             rear_right = self.sensor_limit
         
         # 4 Directions
-        #return [front*100, right*100, rear*100, left*100]
+        # return [front*100, right*100, rear*100, left*100]
         
         # 8 Directions
         return [front*100, right*100, rear*100, left*100, front_left * 100, front_right * 100, rear_left*100, rear_right*100]
