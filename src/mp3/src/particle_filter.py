@@ -36,8 +36,10 @@ class particleFilter:
 
 
             ## first quadrant
-            x = np.random.uniform(0, world.width/4)
-            y = np.random.uniform(0, world.height/4)
+            # x = np.random.uniform(85, 85+120)
+            # y = np.random.uniform(45-75, 45)
+            x = np.random.uniform(world.width/2, world.width)
+            y = np.random.uniform(world.height/2, world.width)
 
             particles.append(Particle(x = x, y = y, maze = world, sensor_limit = sensor_limit))
 
@@ -79,6 +81,7 @@ class particleFilter:
 
     def weight_gaussian_kernel(self,x1, x2, std = 5000):
         if x1 is None: # If the robot recieved no sensor measurement, the weights are in uniform distribution.
+            print("robot no sensor")
             return 1./len(self.particles)
         else:
             tmp1 = np.array(x1)
@@ -95,7 +98,18 @@ class particleFilter:
         """
 
         ## TODO #####
-        return
+        weight_array = []
+        for particle in self.particles:
+            particle_reading = particle.read_sensor()
+            weight = self.weight_gaussian_kernel(readings_robot, particle_reading)   #compute weights
+            weight_array.append(weight)                                         #add weight to array
+
+        weight_array = np.array(weight_array)
+        weight_sum = np.sum(weight_array)
+        normalized = np.divide(weight_array, weight_sum)
+        for i in range(len(self.particles)):
+            self.particles[i].weight = normalized[i]    # set each particle weight to corresponding normalized weight
+        # print(normalized)
         ###############
         # pass
 
@@ -105,11 +119,23 @@ class particleFilter:
             Perform resample to get a new list of particles 
         """
         particles_new = list()
-
         ## TODO #####
-        return
-        
 
+        # calculate cumulative sums
+        particle_weights =[]
+        for i in range(len(self.particles)):
+            if(i == 0):
+                particle_weights.append(self.particles[i].weight)
+                continue
+            #add particle weight to previously calculated weights to get cumulative sum
+            particle_weights.append(particle_weights[i-1]+self.particles[i].weight) 
+        # generate random nums and particle index 
+        for i in range(len(self.particles)):      
+            rand_num = random.uniform(0,1)
+
+            #index of where num could be inserted to maintain order
+            ind = np.searchsorted(particle_weights, rand_num, side = 'left')
+            particles_new.append(self.particles[ind])
         ###############
 
         self.particles = particles_new
@@ -121,12 +147,44 @@ class particleFilter:
             You can either use ode function or vehicle_dynamics function provided above
         """
         ## TODO #####
-        # particles = self.particles
+        particles = self.particles
         control_signal = self.control
-        vehicle_dynam = ode(vehicle_dynamics)
+        dt = 0.01
         t = 0
         # for control_input in control_signal:
-        
+
+        # currState = getModelState()
+        # pos_x = currState.pose.position.x
+        # pos_y = currState.pose.position.y
+        # vel = currentPose.twist.linear
+        # def vehicle_dynamics(t, vars, vr, delta):
+
+        for particle in particles:
+            vehicle_dynam = ode(vehicle_dynamics).set_integrator('vode')
+            state = particle.state #in maze.py Particle class
+
+            #ode method
+            # vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
+            # for v, delta in control_signal:
+            #     vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
+            #     vehicle_dynam.set_f_params(v,delta)
+            #     vehicle_dynam.integrate(vehicle_dynam.t + dt)
+            #     state = vehicle_dynam.y         #returns updated state after integrating over time setep
+            #     t += dt
+            # particle.x = state[0]
+            # particle.y = state[1]
+            # particle.heading = state[2]
+            
+            # vehicle dynamic method
+            for v, delta in control_signal:
+                dx,dy,dtheta = vehicle_dynamics(t, [state[0],state[1],state[2]], v, delta)
+                particle.try_move([dx, dy, dtheta], self.world)
+                # particle.x += dx
+                # particle.y += dy
+                # particle.heading += dtheta
+                t += dt
+
+
         
         ###############
         # pass
@@ -141,6 +199,17 @@ class particleFilter:
         count = 0 
         while True:
             ## TODO: (i) Implement Section 3.2.2. (ii) Display robot and particles on map. (iii) Compute and save position/heading error to plot. #####
+
+            self.particleMotionModel()
+            reading = self.bob.read_sensor()
+            self.updateWeight(reading)
+            self.resampleParticle()
+
+            self.world.show_particles(self.particles)
+            self.world.show_robot(self.bob)
+            self.world.show_estimated_location(self.particles)
             
+            rate = rospy.Rate(100)  # 100 Hz
+            rate.sleep()
             ###############
-            return
+            # return
