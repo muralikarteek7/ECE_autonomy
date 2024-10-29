@@ -77,15 +77,12 @@ class Maze(object):
         '''
         Display the maze
         '''
-
         turtle.setworldcoordinates(0, 0, self.width * 1.005, self.height * 1.005)
-
         wally = turtle.Turtle()
         wally.speed(0)
         wally.width(1.5)
         wally.hideturtle()
         turtle.tracer(0, 0)
-
         for i in range(self.num_rows):
             for j in range(self.num_cols):
                 permissibilities = self.permissibilities(cell = (i,j))
@@ -125,13 +122,13 @@ class Maze(object):
         turtle.update()
 
 
+
     def weight_to_color(self, weight):
 
         return '#%02x00%02x' % (int(weight * 255), int((1 - weight) * 255))
 
 
     def show_particles(self, particles, show_frequency = 10):
-
         turtle.shape('tri')
 
         for i, particle in enumerate(particles):
@@ -303,11 +300,11 @@ class Maze(object):
             d8 += 1
         # Return readings from sensor model in front, right, rear, left direction
         # 4 Directions
-        return [d1*100, d2*100, d3*100, d4*100]
+        # return [d1*100, d2*100, d3*100, d4*100]
 
         # front_left, front_right, rear_left, rear_right
         # 8 Directions
-        # return [d1*100, d2*100, d3*100, d4*100, d5*100, d6*100, d7*100, d8*100]
+        return [d1*100, d2*100, d3*100, d4*100, d5*100, d6*100, d7*100, d8*100]
 
 
 class Particle(object):
@@ -372,7 +369,7 @@ class Particle(object):
         dy = offset[1]
         dtheta = offset[2]
         dpos = np.sqrt(dx**2+dy**2)
-        dtheta_world = offset[3] + curr_theta
+        dtheta_world = offset[2] + curr_theta
         self.heading = (curr_theta+dtheta)%(np.pi*2)
         x = dpos*np.cos(dtheta_world)+curr_x
         y = dpos*np.sin(dtheta_world)+curr_y
