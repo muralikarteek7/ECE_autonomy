@@ -39,7 +39,13 @@ class particleFilter:
             # x = np.random.uniform(85, 85+120)
             # y = np.random.uniform(45-75, 45)
             x = np.random.uniform(world.width/2, world.width)
-            y = np.random.uniform(world.height/2, world.width)
+            y = np.random.uniform(world.height/2, world.height)
+            # x = 85+15
+            # y = 45
+            # x = world.width/2
+            # y = world.height/2
+
+    
 
             particles.append(Particle(x = x, y = y, maze = world, sensor_limit = sensor_limit))
 
@@ -81,7 +87,7 @@ class particleFilter:
 
     def weight_gaussian_kernel(self,x1, x2, std = 5000):
         if x1 is None: # If the robot recieved no sensor measurement, the weights are in uniform distribution.
-            print("robot no sensor")
+            
             return 1./len(self.particles)
         else:
             tmp1 = np.array(x1)
@@ -99,17 +105,35 @@ class particleFilter:
 
         ## TODO #####
         weight_array = []
+        particles_readings = []
         for particle in self.particles:
             particle_reading = particle.read_sensor()
+            # print(particle_reading)
+            particles_readings.append(particle_reading)
+            #don't add values that are in walls
+            # if(0 in particle_reading):
+            #     weight_array.append(0)
+            #     continue
             weight = self.weight_gaussian_kernel(readings_robot, particle_reading)   #compute weights
             weight_array.append(weight)                                         #add weight to array
-
+        # print("Robot: ",readings_robot)
         weight_array = np.array(weight_array)
         weight_sum = np.sum(weight_array)
+        # print(weight_sum)
+        
         normalized = np.divide(weight_array, weight_sum)
         for i in range(len(self.particles)):
             self.particles[i].weight = normalized[i]    # set each particle weight to corresponding normalized weight
         # print(normalized)
+        
+        # ind_max = np.argmax(normalized)
+        # print("=================================")        
+        # # print("robot: ", readings_robot)
+        # print("particles reading: ",particles_readings[ind_max])
+        # if(not np.array(particles_readings[ind_max]).any()):
+        #     print("zero")
+        # print("weight: ", normalized[ind_max])
+
         ###############
         # pass
 
@@ -129,15 +153,30 @@ class particleFilter:
                 continue
             #add particle weight to previously calculated weights to get cumulative sum
             particle_weights.append(particle_weights[i-1]+self.particles[i].weight) 
+            # particle_weights.append(self.particles[i].weight)
         # generate random nums and particle index 
+        indicies = []
         for i in range(len(self.particles)):      
             rand_num = random.uniform(0,1)
+            rand_num = (i+rand_num) / len(self.particles)  
 
             #index of where num could be inserted to maintain order
-            ind = np.searchsorted(particle_weights, rand_num, side = 'left')
-            particles_new.append(self.particles[ind])
-        ###############
+            ind = np.searchsorted(particle_weights, rand_num, side = 'left') 
+            indicies.append(ind)
+            # print(ind)
 
+            new_part = Particle(x = self.particles[ind].x, y = self.particles[ind].y, heading = self.particles[ind].heading, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit, noisy = True)
+            # new_part = Particle(x = self.particles[ind].x, y = self.particles[ind].y, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit)
+
+            particles_new.append(new_part)
+        # new_sample_part = np.random.choice(a=self.particles, size=len(self.particles), replace=True, p=particle_weights)
+        # for ind in range(len(new_sample_part)):      
+
+        #     new_part = Particle(x = new_sample_part[ind].x, y = new_sample_part[ind].y, heading = new_sample_part[ind].heading, maze = new_sample_part[ind].maze, weight = new_sample_part[ind].weight, sensor_limit = new_sample_part[ind].sensor_limit)
+
+        #     particles_new.append(new_part)
+        ###############
+        
         self.particles = particles_new
 
     def particleMotionModel(self):
@@ -151,20 +190,13 @@ class particleFilter:
         control_signal = self.control
         dt = 0.01
         t = 0
-        # for control_input in control_signal:
-
-        # currState = getModelState()
-        # pos_x = currState.pose.position.x
-        # pos_y = currState.pose.position.y
-        # vel = currentPose.twist.linear
-        # def vehicle_dynamics(t, vars, vr, delta):
-
-        for particle in particles:
-            vehicle_dynam = ode(vehicle_dynamics).set_integrator('vode')
-            state = particle.state #in maze.py Particle class
-
-            #ode method
-            # vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
+        # for particle in particles:
+        for v, delta in control_signal:
+            # vehicle_dynam = ode(vehicle_dynamics).set_integrator('vode')
+            # state = particle.state #in maze.py Particle class
+            # # print("========================================")
+            # # ode method
+            # # vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
             # for v, delta in control_signal:
             #     vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
             #     vehicle_dynam.set_f_params(v,delta)
@@ -176,14 +208,27 @@ class particleFilter:
             # particle.heading = state[2]
             
             # vehicle dynamic method
-            for v, delta in control_signal:
-                dx,dy,dtheta = vehicle_dynamics(t, [state[0],state[1],state[2]], v, delta)
-                particle.try_move([dx, dy, dtheta], self.world)
-                # particle.x += dx
-                # particle.y += dy
-                # particle.heading += dtheta
-                t += dt
-
+            # x = state[0]
+            # y = state[1]
+            # theta = state[2]
+            
+            # for v, delta in control_signal:
+            for particle in particles:
+                # print(particle.state)
+                dx,dy,dtheta = vehicle_dynamics(t, [particle.x, particle.y, particle.heading], v, delta)
+                particle.try_move([dx*dt, dy*dt, dtheta*dt], self.world)
+                # state = particle.state
+                # x += dx * dt
+                # y += dy * dt
+                # theta += dtheta * dt
+                # particle.x += dx * dt
+                # particle.y += dy * dt
+                # particle.heading += (dtheta) * dt
+            t += dt
+            # particle.x = x
+            # particle.y = y
+            # particle.heading = theta
+        self.control = []
 
         
         ###############
@@ -199,17 +244,30 @@ class particleFilter:
         count = 0 
         while True:
             ## TODO: (i) Implement Section 3.2.2. (ii) Display robot and particles on map. (iii) Compute and save position/heading error to plot. #####
-
-            self.particleMotionModel()
-            reading = self.bob.read_sensor()
-            self.updateWeight(reading)
-            self.resampleParticle()
-
-            self.world.show_particles(self.particles)
+            self.world.clear_objects()
+            self.world.show_particles(self.particles, show_frequency=20)
             self.world.show_robot(self.bob)
             self.world.show_estimated_location(self.particles)
             
-            rate = rospy.Rate(100)  # 100 Hz
-            rate.sleep()
+
+            reading = self.bob.read_sensor()
+            
+            if(len(self.control) == 0):
+                continue
+            # print("updating")
+
+            if(reading is None):
+                continue
+
+            self.particleMotionModel()
+            self.updateWeight(reading)
+            self.resampleParticle()
+
+            
+
+
+            count += 1
+            # if(count == 2):
+            #     break
             ###############
             # return
