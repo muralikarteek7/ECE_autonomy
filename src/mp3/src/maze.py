@@ -130,7 +130,6 @@ class Maze(object):
 
     def show_particles(self, particles, show_frequency = 10):
         turtle.shape('tri')
-
         for i, particle in enumerate(particles):
             if i % show_frequency == 0:
                 turtle.setposition((particle.x, particle.y))
@@ -259,6 +258,8 @@ class Maze(object):
         d5 = 0
         dx = np.cos(orientation+np.pi/4) * 1 - np.sin(orientation+np.pi/4) * 0
         dy = np.sin(orientation+np.pi/4) * 1 + np.cos(orientation+np.pi/4) * 0
+        # dx = np.cos(orientation+np.pi/4) * 1/np.sqrt(2) - np.sin(orientation+np.pi/4) * 1/np.sqrt(2)
+        # dy = np.sin(orientation+np.pi/4) * 1/np.sqrt(2) + np.cos(orientation+np.pi/4) * 1/np.sqrt(2)
         while not self.colide_wall(int(round(pos_y)),int(round(pos_x))) and d5 < sensor_limit:
             pos_x = pos_x + dx
             pos_y = pos_y + dy
@@ -268,8 +269,11 @@ class Maze(object):
         pos_x = x
         pos_y = y
         d6 = 0
+        # dx = np.cos(orientation-np.pi/4) * 1/np.sqrt(2) - np.sin(orientation-np.pi/4) * 1/np.sqrt(2)
+        # dy = np.sin(orientation-np.pi/4) * 1/np.sqrt(2) + np.cos(orientation-np.pi/4) * 1/np.sqrt(2)
         dx = np.cos(orientation-np.pi/4) * 1 - np.sin(orientation-np.pi/4) * 0
         dy = np.sin(orientation-np.pi/4) * 1 + np.cos(orientation-np.pi/4) * 0
+        
         while not self.colide_wall(int(round(pos_y)),int(round(pos_x))) and d6 < sensor_limit:
             pos_x = pos_x + dx
             pos_y = pos_y + dy
@@ -281,8 +285,11 @@ class Maze(object):
         pos_x = x
         pos_y = y
         d7 = 0
+        # dx = np.cos(orientation+np.pi*3/4) * 1/np.sqrt(2) - np.sin(orientation+np.pi*3/4) * 1/np.sqrt(2)
+        # dy = np.sin(orientation+np.pi*3/4) * 1/np.sqrt(2) + np.cos(orientation+np.pi*3/4) * 1/np.sqrt(2)
         dx = np.cos(orientation+np.pi*3/4) * 1 - np.sin(orientation+np.pi*3/4) * 0
         dy = np.sin(orientation+np.pi*3/4) * 1 + np.cos(orientation+np.pi*3/4) * 0
+        
         while not self.colide_wall(int(round(pos_y)),int(round(pos_x))) and d7 < sensor_limit:
             pos_x = pos_x + dx
             pos_y = pos_y + dy
@@ -292,8 +299,11 @@ class Maze(object):
         pos_x = x
         pos_y = y
         d8 = 0
+        # dx = np.cos(orientation-np.pi*3/4) * 1/np.sqrt(2) - np.sin(orientation-np.pi*3/4) * 1/np.sqrt(2)
+        # dy = np.sin(orientation-np.pi*3/4) * 1/np.sqrt(2) + np.cos(orientation-np.pi*3/4) * 1/np.sqrt(2)
         dx = np.cos(orientation-np.pi*3/4) * 1 - np.sin(orientation-np.pi*3/4) * 0
         dy = np.sin(orientation-np.pi*3/4) * 1 + np.cos(orientation-np.pi*3/4) * 0
+        
         while not self.colide_wall(int(round(pos_y)),int(round(pos_x))) and d8 < sensor_limit:
             pos_x = pos_x + dx
             pos_y = pos_y + dy
@@ -313,6 +323,7 @@ class Particle(object):
 
         if heading is None:
             heading = np.random.uniform(0,2*np.pi)
+            # heading = np.pi/2
 
         self.x = x              # The x position of particle
         self.y = y              # The y position of particle
@@ -378,7 +389,9 @@ class Particle(object):
         gi1 = int(self.y)
         gj2 = int(x)
         gi2 = int(y)
-
+        # print("=============")
+        # print("gj2 ", gj2)
+        # print("gi2 ", gi2)
         # Check if the particle is still in the maze
         if gi2 < 0 or gi2 >= maze.num_rows or gj2 < 0 or gj2 >= maze.num_cols:
             self.x = np.random.uniform(0, maze.width)
