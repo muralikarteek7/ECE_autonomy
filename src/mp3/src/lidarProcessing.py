@@ -277,9 +277,6 @@ class LidarProcessing:
 
 
     def convert_to_image(self, x, y):
-        # print("resolution ", self.resolution)
-        # print("-y/ res ", -y / self.resolution)
-        # print(np.floor(-y / self.resolution).dtype)
         x_img = 0
         y_img = 0
         if not np.isnan(y):
