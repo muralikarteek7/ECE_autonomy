@@ -7,7 +7,7 @@ from gazebo_msgs.srv import GetModelState
 import shutil
 from std_msgs.msg import Float32MultiArray
 from scipy.integrate import ode
-
+import time
 import random
 
 def vehicle_dynamics(t, vars, vr, delta):
@@ -36,16 +36,11 @@ class particleFilter:
 
 
             ## first quadrant
-            # x = np.random.uniform(85, 85+120)
-            # y = np.random.uniform(45-75, 45)
-            x = np.random.uniform(world.width/2, world.width)
-            y = np.random.uniform(world.height/2, world.height)
+            # x = np.random.uniform(world.width/2, world.width)
+            # y = np.random.uniform(world.height/2, world.height)
             # x = 85+15
             # y = 45
-            # x = world.width/2
-            # y = world.height/2
 
-    
 
             particles.append(Particle(x = x, y = y, maze = world, sensor_limit = sensor_limit))
 
@@ -87,7 +82,6 @@ class particleFilter:
 
     def weight_gaussian_kernel(self,x1, x2, std = 5000):
         if x1 is None: # If the robot recieved no sensor measurement, the weights are in uniform distribution.
-            
             return 1./len(self.particles)
         else:
             tmp1 = np.array(x1)
@@ -105,25 +99,30 @@ class particleFilter:
 
         ## TODO #####
         weight_array = []
-        particles_readings = []
+        # particles_readings = []
+        count = len(self.particles)
         for particle in self.particles:
             particle_reading = particle.read_sensor()
             # print(particle_reading)
-            particles_readings.append(particle_reading)
-            #don't add values that are in walls
-            # if(0 in particle_reading):
-            #     weight_array.append(0)
-            #     continue
-            weight = self.weight_gaussian_kernel(readings_robot, particle_reading)   #compute weights
-            weight_array.append(weight)                                         #add weight to array
+            # particles_readings.append(particle_reading)
+            if (0 in particle_reading):
+                # np.append(weight_array,0)
+                weight_array.append(0)
+                continue
+            weight = self.weight_gaussian_kernel(readings_robot, particle_reading, count*10)   #compute weights
+            # np.append(weight_array, weight)                                     #add weight to array
+            weight_array.append(weight)
         # print("Robot: ",readings_robot)
         weight_array = np.array(weight_array)
         weight_sum = np.sum(weight_array)
         # print(weight_sum)
         
         normalized = np.divide(weight_array, weight_sum)
-        for i in range(len(self.particles)):
-            self.particles[i].weight = normalized[i]    # set each particle weight to corresponding normalized weight
+        # print(normalized)
+
+        # for i in range(len(self.particles)):
+        #     self.particles[i].weight = normalized[i]    # set each particle weight to corresponding normalized weight
+        return normalized
         # print(normalized)
         
         # ind_max = np.argmax(normalized)
@@ -137,7 +136,7 @@ class particleFilter:
         ###############
         # pass
 
-    def resampleParticle(self):
+    def resampleParticle(self, weight):
         """
         Description:
             Perform resample to get a new list of particles 
@@ -146,38 +145,45 @@ class particleFilter:
         ## TODO #####
 
         # calculate cumulative sums
-        particle_weights =[]
-        for i in range(len(self.particles)):
-            if(i == 0):
-                particle_weights.append(self.particles[i].weight)
-                continue
-            #add particle weight to previously calculated weights to get cumulative sum
-            particle_weights.append(particle_weights[i-1]+self.particles[i].weight) 
-            # particle_weights.append(self.particles[i].weight)
-        # generate random nums and particle index 
-        indicies = []
-        for i in range(len(self.particles)):      
-            rand_num = random.uniform(0,1)
-            rand_num = (i+rand_num) / len(self.particles)  
+        # particle_weights =[]
+        # for i in range(len(self.particles)):
+        #     if(i == 0):
+        #         particle_weights.append(self.particles[i].weight)
+        #         continue
+        #     #add particle weight to previously calculated weights to get cumulative sum
+        #     particle_weights.append(particle_weights[i-1]+self.particles[i].weight) 
+        #     # particle_weights.append(self.particles[i].weight)
+        # # generate random nums and particle index 
+        # indicies = []
+        # particle_weights = np.array(particle_weights)
+        # # rand_num_lst = np.random.uniform(0,1,len(self.particles))
+        # for i in range(len(self.particles)):      
+        #     rand_num = random.uniform(0,1)
+        #     rand_num = (i+rand_num) / len(self.particles)  
+        #     # rand_num = rand_num_lst[i]
+        #     #index of where num could be inserted to maintain order
+        #     ind = np.searchsorted(particle_weights, rand_num, side = 'left') 
+        #     indicies.append(ind)
+        #     # print(ind)
 
-            #index of where num could be inserted to maintain order
-            ind = np.searchsorted(particle_weights, rand_num, side = 'left') 
-            indicies.append(ind)
-            # print(ind)
+        #     particles_new.append(Particle(x = self.particles[ind].x, y = self.particles[ind].y, heading = self.particles[ind].heading, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit, noisy = True))
+        #     # new_part = Particle(x = self.particles[ind].x, y = self.particles[ind].y, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit)
 
-            new_part = Particle(x = self.particles[ind].x, y = self.particles[ind].y, heading = self.particles[ind].heading, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit, noisy = True)
-            # new_part = Particle(x = self.particles[ind].x, y = self.particles[ind].y, maze = self.particles[ind].maze, weight = self.particles[ind].weight, sensor_limit = self.particles[ind].sensor_limit)
+        #     # particles_new.append(new_part)
+        
+        # weight = np.array(weight)
+        new_sample_part = np.random.choice(a=self.particles, size=len(self.particles), replace=True, p=weight)
+        self.particles = []
+        for ind in range(len(new_sample_part)):      
+            # new_part = Particle(x = new_sample_part[ind].x, y = new_sample_part[ind].y, heading = new_sample_part[ind].heading, maze = new_sample_part[ind].maze, sensor_limit = new_sample_part[ind].sensor_limit)
 
-            particles_new.append(new_part)
-        # new_sample_part = np.random.choice(a=self.particles, size=len(self.particles), replace=True, p=particle_weights)
-        # for ind in range(len(new_sample_part)):      
+            new_part = Particle(x = new_sample_part[ind].x, y = new_sample_part[ind].y, heading = new_sample_part[ind].heading, maze = new_sample_part[ind].maze, sensor_limit = new_sample_part[ind].sensor_limit,  noisy = True)
 
-        #     new_part = Particle(x = new_sample_part[ind].x, y = new_sample_part[ind].y, heading = new_sample_part[ind].heading, maze = new_sample_part[ind].maze, weight = new_sample_part[ind].weight, sensor_limit = new_sample_part[ind].sensor_limit)
-
-        #     particles_new.append(new_part)
+            # particles_new.append(new_part)
+            self.particles.append(new_part)
         ###############
         
-        self.particles = particles_new
+        # self.particles = particles_new
 
     def particleMotionModel(self):
         """
@@ -186,34 +192,51 @@ class particleFilter:
             You can either use ode function or vehicle_dynamics function provided above
         """
         ## TODO #####
+        # print("update particle motion")
         particles = self.particles
         control_signal = self.control
-        dt = 0.01
+        dt = 0.015 #1500
+        dt = 0.0105    #1000
+        # dt = 0.01
         t = 0
-        # for particle in particles:
-        for v, delta in control_signal:
-            # vehicle_dynam = ode(vehicle_dynamics).set_integrator('vode')
-            # state = particle.state #in maze.py Particle class
+        # vehicle_dynam = ode(vehicle_dynamics).set_integrator('dopri5')
+
+        for particle in particles:
+        # for v, delta in self.control:
+            # t = 0
+            # # state = particle.state #in maze.py Particle class
             # # print("========================================")
             # # ode method
             # # vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
+            # vehicle_dynam.set_initial_value([particle.x, particle.y , particle.heading], t)
+            # # vehicle_dynam.set_f_params(v,delta)
             # for v, delta in control_signal:
-            #     vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
+            # # for particle in self.particles:
+            #     # state = particle.state 
+            #     # vehicle_dynam.set_initial_value([particle.x, particle.y , particle.heading], t)
+            #     # vehicle_dynam.set_initial_value([state[0],state[1],state[2]], t)
             #     vehicle_dynam.set_f_params(v,delta)
             #     vehicle_dynam.integrate(vehicle_dynam.t + dt)
-            #     state = vehicle_dynam.y         #returns updated state after integrating over time setep
+            #     # state = vehicle_dynam.y         #returns updated state after integrating over time setep
+            #     particle.x = vehicle_dynam.y[0]
+            #     particle.y = vehicle_dynam.y[1]
+            #     particle.heading = vehicle_dynam.y[2]
+            #     # print(particle.x)
+            #     # print(particle.y)
+            #     # print(particle.heading)
             #     t += dt
             # particle.x = state[0]
             # particle.y = state[1]
             # particle.heading = state[2]
+            # particle.try_move([particle.x - state[0], particle.y - state[1], particle.heading - state[2]], self.world)
             
             # vehicle dynamic method
             # x = state[0]
             # y = state[1]
             # theta = state[2]
             
-            # for v, delta in control_signal:
-            for particle in particles:
+            for v, delta in control_signal:
+            # for particle in particles:
                 # print(particle.state)
                 dx,dy,dtheta = vehicle_dynamics(t, [particle.x, particle.y, particle.heading], v, delta)
                 particle.try_move([dx*dt, dy*dt, dtheta*dt], self.world)
@@ -224,16 +247,16 @@ class particleFilter:
                 # particle.x += dx * dt
                 # particle.y += dy * dt
                 # particle.heading += (dtheta) * dt
-            t += dt
-            # particle.x = x
-            # particle.y = y
-            # particle.heading = theta
+            # t += dt
+            # # particle.x = x
+            # # particle.y = y
+            # # particle.heading = theta
         self.control = []
 
         
         ###############
         # pass
-        return
+        # return
 
 
     def runFilter(self):
@@ -242,28 +265,46 @@ class particleFilter:
             Run PF localization
         """
         count = 0 
+        error = []
+        orientation_err = []
+        self.world.clear_objects()
+        self.world.show_particles(self.particles, show_frequency=30)
+        self.world.show_robot(self.bob)
         while True:
             ## TODO: (i) Implement Section 3.2.2. (ii) Display robot and particles on map. (iii) Compute and save position/heading error to plot. #####
-            self.world.clear_objects()
-            self.world.show_particles(self.particles, show_frequency=20)
-            self.world.show_robot(self.bob)
-            self.world.show_estimated_location(self.particles)
-            
+                        
+            # if(count % 2 == 0):
+        
 
             reading = self.bob.read_sensor()
-            
+
             if(len(self.control) == 0):
                 continue
-            # print("updating")
+            # # print("updating")
 
             if(reading is None):
+            #     print("reading 0")
                 continue
 
             self.particleMotionModel()
-            self.updateWeight(reading)
-            self.resampleParticle()
-
+            weight = self.updateWeight(reading)
+            self.resampleParticle(weight)
+            if(count % 2 == 0):
+                self.world.clear_objects()
+                self.world.show_particles(self.particles, show_frequency=30)
+                self.world.show_robot(self.bob)
+                estimated_location = self.world.show_estimated_location(self.particles)
             
+            car_state = self.bob.getModelState()
+
+
+            euclidian_dist = np.sqrt((car_state.pose.position.x - estimated_location[0])**2 + (car_state.pose.position.y - estimated_location[1])**2)
+            _,_ , yaw = quaternion_to_euler(x=car_state.pose.orientation.x, y=car_state.pose.orientation.y, z=car_state.pose.orientation.z, w=car_state.pose.orientation.w)
+            orientation = np.abs(yaw - estimated_location[2])
+            
+            #appending errors to lists
+            error.append(euclidian_dist)
+            orientation_err.append(orientation)
 
 
             count += 1
@@ -271,3 +312,24 @@ class particleFilter:
             #     break
             ###############
             # return
+            # 96,47]
+            distToTargetX = abs(car_state.pose.position.x - (96 + 15 - 100))
+            distToTargetY = abs(car_state.pose.position.y - 47)
+
+            if(distToTargetX < 1 and distToTargetY < 1):
+                break
+        return error, orientation_err, count
+    
+
+def quaternion_to_euler(x, y, z, w):
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll = np.arctan2(t0, t1)
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        pitch = np.arcsin(t2)
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw = np.arctan2(t3, t4)
+        return [roll, pitch, yaw]
