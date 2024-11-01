@@ -9,6 +9,7 @@ from std_msgs.msg import Float32MultiArray
 from scipy.integrate import ode
 import time
 import random
+import matplotlib.pyplot as plt 
 
 def vehicle_dynamics(t, vars, vr, delta):
     curr_x = vars[0]
@@ -54,6 +55,8 @@ class particleFilter:
         self.modelStatePub = rospy.Publisher("/gazebo/set_model_state", ModelState, queue_size=1)
         self.controlSub = rospy.Subscriber("/gem/control", Float32MultiArray, self.__controlHandler, queue_size = 1)
         self.control = []                   # A list of control signal from the vehicle
+        self.positionerrors = []
+        self.orientationerrors = []
         return
 
     def __controlHandler(self,data):
@@ -258,19 +261,64 @@ class particleFilter:
         # pass
         # return
 
+    def estimate_position(self):
+        """
+        Estimate the current position of the robot based on particles.
+        """
+        x_accum = 0
+        y_accum = 0
+        heading_sin_accum = 0
+        heading_cos_accum = 0
+        weight_accum = 0
+
+        for particle in self.particles:
+            x_accum += particle.x * particle.weight
+            y_accum += particle.y * particle.weight
+            heading_cos_accum += np.cos(particle.heading) * particle.weight
+            heading_sin_accum += np.sin(particle.heading) * particle.weight
+            weight_accum += particle.weight
+
+        if weight_accum == 0:
+            return [0, 0, 0]
+
+        x_estimate = x_accum / weight_accum
+        y_estimate = y_accum / weight_accum
+        heading_estimate = np.arctan2(heading_sin_accum, heading_cos_accum)
+
+        return [x_estimate, y_estimate, heading_estimate]
+
+
+
+    def finderrors(self, true_position, estimated_position):
+
+        pos_error = np.sqrt((true_position[0] - estimated_position[0]) ** 2 +
+                            (true_position[1] - estimated_position[1]) ** 2)
+        orientation_error = abs(true_position[2] - estimated_position[2]) % (2 * np.pi)
+        return pos_error, orientation_error
 
     def runFilter(self):
         """
         Description:
             Run PF localization
         """
+        plt.ion()
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 5))
+        position_line, = ax1.plot([], [], label="Pos Error")
+        orientation_line, = ax2.plot([], [], label="Ori Error")
+        ax1.set_xlabel("Iterations")
+        ax1.set_ylabel("Position Error (m)")
+        ax1.legend()
+        ax2.set_xlabel("Iterations")
+        ax2.set_ylabel("Orientation Error (radians)")
+        ax2.legend()
+
         count = 0 
         error = []
         orientation_err = []
         self.world.clear_objects()
         self.world.show_particles(self.particles, show_frequency=30)
         self.world.show_robot(self.bob)
-        while True:
+        while not rospy.is_shutdown():
             ## TODO: (i) Implement Section 3.2.2. (ii) Display robot and particles on map. (iii) Compute and save position/heading error to plot. #####
                         
             # if(count % 2 == 0):
@@ -298,13 +346,27 @@ class particleFilter:
             car_state = self.bob.getModelState()
 
 
-            euclidian_dist = np.sqrt((car_state.pose.position.x - estimated_location[0])**2 + (car_state.pose.position.y - estimated_location[1])**2)
-            _,_ , yaw = quaternion_to_euler(x=car_state.pose.orientation.x, y=car_state.pose.orientation.y, z=car_state.pose.orientation.z, w=car_state.pose.orientation.w)
-            orientation = np.abs(yaw - estimated_location[2])
-            
+            estimated_position = self.estimate_position()
+            pos_error, orientation_error = self.finderrors(
+                [self.bob.x, self.bob.y,
+                    self.bob.heading],
+                estimated_position
+            )
+            self.positionerrors.append(pos_error)
+            self.orientationerrors.append(orientation_error)
+
+            position_line.set_data(range(len(self.positionerrors)), self.positionerrors)
+            orientation_line.set_data(range(len(self.orientationerrors)), self.orientationerrors)
+            ax1.relim()
+            ax2.relim()
+            ax1.autoscale_view()
+            ax2.autoscale_view()
+            plt.draw()
+            plt.pause(0.001)
+
             #appending errors to lists
-            error.append(euclidian_dist)
-            orientation_err.append(orientation)
+            error.append(pos_error)
+            orientation_err.append(orientation_error)
 
 
             count += 1
